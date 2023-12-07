@@ -2,10 +2,6 @@ import pygame
 import random
 import math
 
-# Initialize Pygame
-pygame.init()
-
-# Constants
 WIDTH, HEIGHT = 800, 600
 MAP_WIDTH, MAP_HEIGHT = 8000, 6000
 PERSON_SIZE = 30
@@ -14,106 +10,109 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 FPS = 60
 
-# Create the window
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption('Airport Adventure')
-
-# Clock for controlling FPS
-clock = pygame.time.Clock()
-
-# Player attributes
-player_x, player_y = WIDTH // 2, HEIGHT // 2
-player_radius = PERSON_SIZE // 2
-player_speed = 0.8  # Initial speed
-
-# List to hold food items
-foods = []
-
-# Class for obstacles
 class Obstacle:
+    def __init__(self, map_width, map_height):
+        self.x = random.randint(-map_width // 2, map_width // 2)
+        self.y = random.randint(-map_height // 2, map_height // 2)
+        self.speed = 0.8 + 0.1  # Initial speed
+
+    def draw(self, screen):
+        pygame.draw.circle(screen, RED, (self.x + WIDTH // 2, self.y + HEIGHT // 2), PERSON_SIZE // 2)
+
+    def chase_player(self, player):
+        dx = player.x - self.x
+        dy = player.y - self.y
+
+        self.speed = 0.8 + 0.1
+        if dx != 0:
+            if dx < 0:
+                self.x -= self.speed  # Decrease x distance
+            else:
+                self.x += self.speed  # Decrease x distance
+
+        if dy != 0:
+            if dy < 0:
+                self.y -= self.speed  # Decrease y distance
+            else:
+                self.y += self.speed  # Decrease y distance
+
+        print("OBSTACLE: ", self.x, self.y)
+        print(player.x, player.y)
+
+class Player:
+    def __init__(self, width, height):
+        self.x = width // 2
+        self.y = height // 2
+        self.radius = PERSON_SIZE // 2
+        self.speed = 0.8
+
+    def move(self, keys, map_width, map_height):
+        if keys[pygame.K_LEFT] and self.x - self.speed > -map_width // 2:
+            self.x -= self.speed
+        if keys[pygame.K_RIGHT] and self.x + self.speed < map_width // 2:
+            self.x += self.speed
+        if keys[pygame.K_UP] and self.y - self.speed > -map_height // 2:
+            self.y -= self.speed
+        if keys[pygame.K_DOWN] and self.y + self.speed < map_height // 2:
+            self.y += self.speed
+
+class Game:
     def __init__(self):
-        self.x = random.randint(-MAP_WIDTH // 2, MAP_WIDTH // 2)
-        self.y = random.randint(-MAP_HEIGHT // 2, MAP_HEIGHT // 2)
-        self.speed = player_speed  # Same speed as player
-    
-    def draw(self, offset_x, offset_y):
-        pygame.draw.circle(screen, RED, (self.x + offset_x + WIDTH // 2, self.y + offset_y + HEIGHT // 2), PERSON_SIZE // 2)
+        pygame.init()
 
-    def chase_player(self, player_x, player_y):
-        dx = player_x - self.x
-        dy = player_y - self.y
-        distance = math.sqrt(dx ** 2 + dy ** 2)
-        
-        if distance != 0:
-            # updates speed to match player
-            self.speed = player_speed
-            self.x += self.speed * dx / distance
-            self.y += self.speed * dy / distance
 
-# Function to generate food at random positions within visible area
-def generate_food():
-    for _ in range(1000):  # You can adjust the number of food items as needed
-        x = random.randint(-MAP_WIDTH // 2, MAP_WIDTH // 2)
-        y = random.randint(-MAP_HEIGHT // 2, MAP_HEIGHT // 2)
-        foods.append((x, y))
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption('Airport Adventure')
 
-generate_food()
+        self.clock = pygame.time.Clock()
 
-# List to hold obstacles
-obstacles = []
+        self.foods = []
+        self.obstacles = []
 
-# Function to generate obstacles
-def generate_obstacles():
-    for _ in range(20):  # 20 obstacles
-        obstacle = Obstacle()
-        obstacles.append(obstacle)
+        self.player = Player(WIDTH, HEIGHT)
+        self.generate_food()
+        self.generate_obstacles()
 
-generate_obstacles()
+    def generate_food(self):
+        for _ in range(1000):
+            x = random.randint(-MAP_WIDTH // 2, MAP_WIDTH // 2)
+            y = random.randint(-MAP_HEIGHT // 2, MAP_HEIGHT // 2)
+            self.foods.append((x, y))
 
-# Game loop
-running = True
-offset_x, offset_y = 0, 0
+    def generate_obstacles(self):
+        for _ in range(20):
+            obstacle = Obstacle(MAP_WIDTH, MAP_HEIGHT)
+            self.obstacles.append(obstacle)
 
-while running:
-    screen.fill(WHITE)
+    def run(self):
+        running = True
 
-    # Handle events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        while running:
+            self.screen.fill(WHITE)
 
-    # Get the current position of the player
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT] and offset_x < MAP_WIDTH // 2:
-        offset_x += player_speed
-    if keys[pygame.K_RIGHT] and offset_x > -MAP_WIDTH // 2:
-        offset_x -= player_speed
-    if keys[pygame.K_UP] and offset_y < MAP_HEIGHT // 2:
-        offset_y += player_speed
-    if keys[pygame.K_DOWN] and offset_y > -MAP_HEIGHT // 2:
-        offset_y -= player_speed
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
 
-    # Update obstacles' positions and draw them
-    for obstacle in obstacles:
-        obstacle.chase_player(player_x, player_y)
-        obstacle.draw(offset_x, offset_y)
+            keys = pygame.key.get_pressed()
+            self.player.move(keys, MAP_WIDTH, MAP_HEIGHT)
 
-    # Draw food items
-    for food in foods:
-        pygame.draw.circle(screen, RED, (food[0] + offset_x + WIDTH // 2, food[1] + offset_y + HEIGHT // 2), FOOD_SIZE // 2)
+            for obstacle in self.obstacles:
+                obstacle.chase_player(self.player)
+                obstacle.draw(self.screen)
 
-    # Draw player
-    pygame.draw.circle(screen, RED, (WIDTH // 2, HEIGHT // 2), player_radius)
+            for food in self.foods:
+                pygame.draw.circle(self.screen, RED,
+                                   (food[0] + self.player.x + WIDTH // 2,
+                                    food[1] + self.player.y + HEIGHT // 2),
+                                   FOOD_SIZE // 2)
 
-    # Check for collision with food
-    for food in foods[:]:
-        if math.dist((food[0] + offset_x + WIDTH // 2, food[1] + offset_y + HEIGHT // 2), (player_x, player_y)) <= (
-                player_radius + FOOD_SIZE // 2):
-            foods.remove(food)
-            player_speed += 0.1  # Increase player speed slightly when eating food
+            pygame.draw.circle(self.screen, RED, (WIDTH // 2, HEIGHT // 2), self.player.radius)
 
-    pygame.display.flip()
-    clock.tick(FPS)
+            pygame.display.flip()
+            self.clock.tick(FPS)
 
-# Quit Pygame
-pygame.quit()
+        pygame.quit()
+
+game = Game()
+game.run()
