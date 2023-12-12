@@ -10,7 +10,7 @@ the next state will be. The FSM has a dictionary of transitions that associate t
 Where "action" is a function you define. The symbols and states can be any
 objects. You use the add_transition() method to add to the transition table.
 
-@author: Ms. Namasivayam
+@author: Ms. Namasivayam and Kate Little
 @version: 2022
 """
 
@@ -68,7 +68,7 @@ class FSM:
         Args:
             input_symbol (anything): The input to process
         """
-        if self.current_state != "Victory": 
+        if self.current_state != "still": 
             action, state = self.get_transition(input_symbol, self.current_state)
             if action != None: 
                 action()
