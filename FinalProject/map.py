@@ -7,26 +7,29 @@ from fsm import FSM
 
 WIDTH, HEIGHT = 800, 600
 MAP_WIDTH, MAP_HEIGHT = 8000, 6000
-PERSON_SIZE = 30
 FOOD_SIZE = 10
 WHITE = (255, 255, 255)
-GRAY = (211, 211, 211)
+BLUE = (177, 212, 229)
+DARK_BLUE = (0, 173, 219)
 RED = (255, 0, 0)
 FPS = 60
 filepath = "images/"
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, width, height):
+        super().__init__()
         self.x = int(width // 2)
         self.y = int(height // 2)
-        self.width = 34
-        self.height = 43
-        self.speed = 0.8
-        self.image = pygame.image.load(filepath+"dora.png")
+        self.width = 48
+        self.height = 52
+        self.speed = 1
+        self.image = pygame.image.load(filepath+"traveler.png")
         self.rect = self.image.get_rect()
         self.last_meal_time = 0
+        self.has_won = False
         self.rect.center = (width // 2, height // 2)  # Set the center of the image
 
+    # Sets key movements
     def move(self, keys, map_width, map_height):
         if keys[pygame.K_LEFT] and self.x - self.speed > -map_width // 2:
             self.x -= self.speed
@@ -41,12 +44,16 @@ class Player(pygame.sprite.Sprite):
     def has_eaten_recently(self):
         current_time = time.time()
         time_difference = current_time - self.last_meal_time
-        return time_difference <= 2  # Return True if within 2 seconds, else False
+        # Return True if player has eaten within .8 seconds, otherwise return False
+        return time_difference <= .8  
     
     # Checks to see if player is in top right corner of map, aka where the plane is 
-    # Won't work because player's coordinates always stay the same, right? 
     def has_reached_plane(self):
-        return self.x == MAP_WIDTH // 2 and self.y == MAP_HEIGHT // 2
+        # Define a margin for the corner
+        margin = 10
+        self.has_won = self.x >= MAP_WIDTH // 2 - margin and self.y <= -MAP_HEIGHT // 2 + margin
+        # Check if the player's coordinates are within the upper right corner with a margin
+        return self.has_won
     
     #If player has stopped moving, it's dead 
     def is_dead(self): 
@@ -55,10 +62,11 @@ class Player(pygame.sprite.Sprite):
             
 class Obstacle(pygame.sprite.Sprite):
     def __init__(self, map_width, map_height, player):
+        super().__init__()
         self.x = int(random.randint(-map_width // 2, map_width // 2))
         self.y = int(random.randint(-map_height // 2, map_height // 2))
         # make it so that it moves at player's speed
-        self.speed = 0.7  # Initial speed
+        self.speed = 1 
         self.images = [pygame.image.load(filepath+"suitcase.png"), pygame.image.load(filepath+"tsa_officer.png")]
         self.image = random.choice(self.images)  # Randomly choose image
         # Set dimensions 
@@ -104,8 +112,16 @@ class Obstacle(pygame.sprite.Sprite):
     # ACTION
     # Makes the obstacle run away from the player 
     def scatter_from_player(self): 
-        dx = self.x - self.player.x
-        dy = self.y - self.player.y
+        dx = -(self.player.x - self.x)
+        dy = -(self.player.y - self.y)
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+
+        if distance > 5:
+            if abs(dx) > 5:
+                dx /= distance
+            if abs(dy) > 5:
+                dy /= distance
+
         self.x += dx * self.speed
         self.y += dy * self.speed
 
@@ -143,8 +159,6 @@ class Obstacle(pygame.sprite.Sprite):
 
 
 
-    
-
 class Game:
     def __init__(self):
         pygame.init()
@@ -155,31 +169,50 @@ class Game:
         self.clock = pygame.time.Clock()
 
         self.foods = []
-        self.obstacles = []
+        self.obstacles = pygame.sprite.Group()
+        # Generate random colors that correspond with each food 
+        self.food_colors = [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for _ in range(700)]
 
         self.player = Player(WIDTH, HEIGHT)
         self.generate_food()
         self.generate_obstacles()
+    
+    def print_message(self, message): 
+            font = pygame.font.Font(None, 80)
+            text_surface = font.render(message, True, DARK_BLUE)
+            text_rect = text_surface.get_rect()
+            # Position the text in the center of the screen
+            text_rect.center = (WIDTH // 2, HEIGHT // 2)
+            self.screen.blit(text_surface, text_rect)
+            pygame.display.flip()
 
     def generate_food(self):
-        for _ in range(1000):
+        for _ in range(700):
             x = random.randint(-MAP_WIDTH // 2, MAP_WIDTH // 2)
             y = random.randint(-MAP_HEIGHT // 2, MAP_HEIGHT // 2)
             self.foods.append((x, y))
 
     def generate_obstacles(self):
-        for _ in range(20):
+        for _ in range(35):
             obstacle = Obstacle(MAP_WIDTH, MAP_HEIGHT, self.player)
+            obstacle.x = random.randint(-MAP_WIDTH // 2 + self.player.width, MAP_WIDTH // 2 - self.player.width)
+            obstacle.y = random.randint(-MAP_HEIGHT // 2 + self.player.height, MAP_HEIGHT // 2 - self.player.height)
             # Initialize's the obstacle's FSM 
             obstacle.init_fsm()
-            self.obstacles.append(obstacle)
+            self.obstacles.add(obstacle)
 
     def run(self):
         running = True
-
-        while running:
-            self.screen.fill(GRAY)
         
+        # Preps to draw airplane in upper right corner of map 
+        airplane_image = pygame.image.load(filepath+"airplane.png")
+        airplane_rect = airplane_image.get_rect()
+        airplane_rect.top = -MAP_HEIGHT // 2 - 100  # Adjust the value as needed
+        airplane_rect.right = MAP_WIDTH // 2 + 100  # Adjust the value as needed
+        
+        while running:
+            self.screen.fill(BLUE)
+
             # Draw grid lines
             for x in range(-MAP_WIDTH // 2, MAP_WIDTH // 2, 50):
                 pygame.draw.line(self.screen, WHITE, (x + WIDTH // 2 - self.player.x % 50, -MAP_HEIGHT // 2 + HEIGHT // 2 - self.player.y % 50), 
@@ -199,13 +232,31 @@ class Game:
             for obstacle in self.obstacles:
                 # process the obstacle's FSM 
                 obstacle.fsm.process(obstacle.get_input_symbol())
-                # This should NOT be the automatic action. I need to check the fsm to see what to do 
+
+                # Update obstacle's position based on FSM state
+                if obstacle.get_state() == "chasing":
+                    obstacle.chase_player()
+                elif obstacle.get_state() == "scattering":
+                    obstacle.scatter_from_player()
+                
+                
                 #obstacle.chase_player(self.player)
                 obstacle.draw(self.screen, self.player.x, self.player.y)
 
                 # Check collision between player and obstacle
                 obstacle_x, obstacle_y = obstacle.x, obstacle.y
-                distance = math.sqrt((obstacle_x - self.player.x) ** 2 + (obstacle_y - self.player.y) ** 2)
+                delta_x = obstacle_x - self.player.x
+                delta_y = obstacle_y - self.player.y
+                distance_squared = delta_x ** 2 + delta_y ** 2
+
+                # Calculate maximum allowable distance
+                max_distance = (self.player.width + obstacle.width // 2) ** 2
+
+                # Check if the squared distance exceeds the maximum allowable distance
+                if distance_squared <= max_distance:
+                    distance = math.sqrt(distance_squared)
+                else:
+                    distance = float('inf')  # Assign a value to signify the distance is too large
 
                 if distance <= (self.player.width + obstacle.width // 2):
                     self.obstacles.remove(obstacle)
@@ -214,6 +265,7 @@ class Game:
             # Iterate over food items with index for accurate removal
             index = 0
             while index < len(self.foods):
+                # print(index)
                 food = self.foods[index]
                 food_x, food_y = food[0], food[1]
 
@@ -227,19 +279,31 @@ class Game:
                     self.player.last_meal_time = time.time()
                 else:
                     # Draw food item
-                    pygame.draw.circle(self.screen, RED, (food_x + WIDTH // 2 - self.player.x, food_y + HEIGHT // 2 - self.player.y), FOOD_SIZE // 2)
+                    food_color = self.food_colors[index]
+                    pygame.draw.circle(self.screen, food_color, (food_x + WIDTH // 2 - self.player.x, 
+                                                                 food_y + HEIGHT // 2 - self.player.y), FOOD_SIZE // 2)
                     index += 1  # Move to the next food item if no collision
 
             # Draw player 
             self.screen.blit(self.player.image, self.player.rect)
 
-            pygame.display.flip()
-            self.clock.tick(FPS)
+            # Draw airplane 
+            self.screen.blit(airplane_image, airplane_rect)
 
+            # Draw a rectangle where the airplane should be positioned
+            pygame.draw.rect(self.screen, (255, 0, 0), airplane_rect, 2)
+    
             if self.player.is_dead():
+                self.print_message("You Lose")
                 running = False
 
-        # Here, print something that indicates that the player has lost 
+            if self.player.has_won: 
+                self.print_message("You Win!")
+                running = False
+        
+            pygame.display.flip()
+            self.clock.tick(FPS)
+            
         pygame.time.wait(2000)
         pygame.quit()
 
