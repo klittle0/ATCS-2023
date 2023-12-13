@@ -68,16 +68,17 @@ class Obstacle(pygame.sprite.Sprite):
         # make it so that it moves at player's speed
         self.speed = 1 
         self.images = [pygame.image.load(filepath+"suitcase.png"), pygame.image.load(filepath+"tsa_officer.png")]
-        self.image = random.choice(self.images)  # Randomly choose image
+        self.image = random.choice(self.images) 
         # Set dimensions 
         self.width, self.height = 25, 40
         self.close_to_player = False
         self.player = player
 
-        # Creates FSM 
+        # Create FSM 
         self.fsm = FSM("chasing")
         self.init_fsm()
 
+    # Draw obstacle 
     def draw(self, screen, player_x, player_y):
         screen.blit(self.image, (self.x + WIDTH // 2 - player_x - self.width // 2, self.y + HEIGHT // 2 - player_y - self.height // 2))
 
@@ -207,8 +208,8 @@ class Game:
         # Preps to draw airplane in upper right corner of map 
         airplane_image = pygame.image.load(filepath+"airplane.png")
         airplane_rect = airplane_image.get_rect()
-        airplane_rect.top = -MAP_HEIGHT // 2 - 100  # Adjust the value as needed
-        airplane_rect.right = MAP_WIDTH // 2 + 100  # Adjust the value as needed
+        airplane_rect.top = 400
+        airplane_rect.right = 300
         
         while running:
             self.screen.fill(BLUE)
@@ -247,25 +248,17 @@ class Game:
                 obstacle_x, obstacle_y = obstacle.x, obstacle.y
                 delta_x = obstacle_x - self.player.x
                 delta_y = obstacle_y - self.player.y
-                distance_squared = delta_x ** 2 + delta_y ** 2
+                distance = math.sqrt(delta_x ** 2 + delta_y ** 2)
 
-                # Calculate maximum allowable distance
-                max_distance = (self.player.width + obstacle.width // 2) ** 2
-
-                # Check if the squared distance exceeds the maximum allowable distance
-                if distance_squared <= max_distance:
-                    distance = math.sqrt(distance_squared)
-                else:
-                    distance = float('inf')  # Assign a value to signify the distance is too large
-
+                # Obstacle disappears and player speed decreases when collision detected
                 if distance <= (self.player.width + obstacle.width // 2):
                     self.obstacles.remove(obstacle)
-                    self.player.speed -= 0.35  # Decrease player speed when hitting an obstacle
+                    self.player.speed -= 0.35  
 
             # Iterate over food items with index for accurate removal
             index = 0
             while index < len(self.foods):
-                # print(index)
+                
                 food = self.foods[index]
                 food_x, food_y = food[0], food[1]
 
@@ -287,12 +280,13 @@ class Game:
             # Draw player 
             self.screen.blit(self.player.image, self.player.rect)
 
+        
+            # Calculate airplane position relative to player and map
+            airplane_offset_x = MAP_WIDTH // 2 - self.player.x + WIDTH // 2 - airplane_rect.width + 200
+            airplane_offset_y = -MAP_HEIGHT // 2 - self.player.y + HEIGHT // 2 - 200
             # Draw airplane 
-            self.screen.blit(airplane_image, airplane_rect)
+            self.screen.blit(airplane_image, (airplane_offset_x, airplane_offset_y))
 
-            # Draw a rectangle where the airplane should be positioned
-            pygame.draw.rect(self.screen, (255, 0, 0), airplane_rect, 2)
-    
             if self.player.is_dead():
                 self.print_message("You Lose")
                 running = False
